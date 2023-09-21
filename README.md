@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This repository contains broken ERC-20 contract, based on Open Zeppelin implementation. It does not work well and your 
+This repository contains broken ERC-20 contract, based on Open Zeppelin implementation. It does not work well and your
 task is to write unit test, find all mistakes and correct the contract, so it will work as expected. Enjoy!
 
 ## Getting started
@@ -31,7 +31,7 @@ task is to write unit test, find all mistakes and correct the contract, so it wi
 - Should emit transfer event with right args
 - Should increase contract ethers balance
 - Should decrease caller ethers balance
-- Should revert if message value is less than price * token amount
+- Should revert if message value is less than price \* token amount
 - Make tests for several mints for different addresses in one unit test
 
 ### Transfer
@@ -70,7 +70,7 @@ task is to write unit test, find all mistakes and correct the contract, so it wi
 
 - Should update `_allowances` mapping by decreasing on `amount`
 - Should emit approval event with right args
-- Should revert if approval given for zero address
+- Should revert if approval given for zero address --
 - Should revert if decreased allowance is below zero
 - Make tests for several decreasings for different addresses in one unit test
 
@@ -82,9 +82,9 @@ task is to write unit test, find all mistakes and correct the contract, so it wi
 - Should not change total supply
 - Should emit transfer event
 - Should revert if `to` is a zero address
-- Should revert if `from` is a zero address
+- Should revert if `from` is a zero address --
 - Should revert if allowance is not enough
-- Should revert if allowance is 0
+- Should revert if allowance is 0 --
 - Should revert if not enough balance on `from` address
 - Make tests for several transfers for different addresses in one unit test
 

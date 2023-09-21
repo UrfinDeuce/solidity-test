@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
  * solidity QA position. Do not use in any other cases!
  */
 contract ERC20 {
-
+    
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
      * another (`to`).
@@ -24,7 +24,9 @@ contract ERC20 {
     // Mapping user address => user token balance
     mapping(address => uint256) private _balances;
 
-    // Mapping token owner address => user allowed to operate with token owner tokens => amount of tokens allowed to operate
+    // Mapping token owner address =>
+    // user allowed to operate with token owner tokens =>
+    // amount of tokens allowed to operate
     mapping(address => mapping(address => uint256)) private _allowances;
 
     // Total tokens supply
@@ -69,7 +71,7 @@ contract ERC20 {
     /**
      * @dev Returns the price of the token
      */
-    function price() public view returns(uint256) {
+    function price() public view returns (uint256) {
         return _price;
     }
 
@@ -112,6 +114,7 @@ contract ERC20 {
      * - the caller must have a balance of at least `amount`.
      */
     function mint(uint256 amount) external payable {
+        require(msg.value >= amount * _price, "ERC20: value is less than required");
         _mint(msg.sender, amount);
     }
 
@@ -138,7 +141,7 @@ contract ERC20 {
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address to, uint256 amount) public virtual returns (bool) {
-        _transfer(msg.sender, msg.sender, amount);
+        _transfer(msg.sender, to, amount);
         return true;
     }
 
@@ -146,7 +149,7 @@ contract ERC20 {
      * Returns allowance amount given from `owner` to `spender`
      */
     function allowance(address owner, address spender) public view virtual returns (uint256) {
-        return _allowances[spender][owner];
+        return _allowances[owner][spender];
     }
 
     /**
@@ -199,7 +202,15 @@ contract ERC20 {
      */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
         address owner = msg.sender;
-        _approve(owner, spender, addedValue);
+        uint256 currentAllowance = allowance(owner, spender);
+        require(
+            currentAllowance + addedValue >= currentAllowance,
+            "ERC20: increased allowance exceeds type(uint256).max"
+        );
+        unchecked {
+            _approve(owner, spender, currentAllowance + addedValue);
+        }
+
         return true;
     }
 
@@ -214,13 +225,16 @@ contract ERC20 {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+    function decreaseAllowance(
+        address spender,
+        uint256 subtractedValue
+    ) public virtual returns (bool) {
         address owner = msg.sender;
         uint256 currentAllowance = allowance(owner, spender);
         require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
-    unchecked {
-        _approve(owner, spender, currentAllowance - subtractedValue);
-    }
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
 
         return true;
     }
@@ -247,12 +261,12 @@ contract ERC20 {
 
         uint256 fromBalance = _balances[from];
         require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
-    unchecked {
-        _balances[to] = fromBalance - amount;
-        // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
-        // decrementing then incrementing.
-        _balances[to] += amount;
-    }
+        unchecked {
+            _balances[from] -= amount;
+            // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
+            // decrementing then incrementing.
+            _balances[to] += amount;
+        }
 
         emit Transfer(from, to, amount);
 
@@ -273,11 +287,11 @@ contract ERC20 {
 
         _beforeTokenTransfer(address(0), account, amount);
 
-        _totalSupply = amount;
-    unchecked {
-        // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
-        _balances[account] += amount;
-    }
+        _totalSupply += amount;
+        unchecked {
+            // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
+            _balances[account] += amount;
+        }
         emit Transfer(address(0), account, amount);
 
         _afterTokenTransfer(address(0), account, amount);
@@ -300,12 +314,12 @@ contract ERC20 {
         _beforeTokenTransfer(account, address(0), amount);
 
         uint256 accountBalance = _balances[account];
-        require(accountBalance <= amount, "ERC20: burn amount exceeds balance");
-    unchecked {
-        _balances[account] = accountBalance - amount;
-        // Overflow not possible: amount <= accountBalance <= totalSupply.
-        _totalSupply -= amount;
-    }
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+            // Overflow not possible: amount <= accountBalance <= totalSupply.
+            _totalSupply -= amount;
+        }
 
         emit Transfer(account, address(0), amount);
 
@@ -345,9 +359,9 @@ contract ERC20 {
         uint256 currentAllowance = allowance(owner, spender);
         if (currentAllowance != type(uint256).max) {
             require(currentAllowance >= amount, "ERC20: insufficient allowance");
-        unchecked {
-            _approve(owner, spender, currentAllowance - amount);
-        }
+            unchecked {
+                _approve(owner, spender, currentAllowance - amount);
+            }
         }
     }
 

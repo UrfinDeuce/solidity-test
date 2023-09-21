@@ -1,0 +1,35 @@
+{
+  "env": {
+    "browser": true,
+    "es6": true
+  },
+  "extends": [
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "globals": {
+    "Atomics": "readonly",
+    "SharedArrayBuffer": "readonly"
+  },
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module"
+  },
+  "root": true,
+  "rules": {
+    "indent": ["error", 2],
+    "no-undef": "off",
+    "prefer-const": "off",
+    "no-console": "off",
+    "linebreak-style": "off",
+    "operator-linebreak": "off",
+    "object-curly-newline": "off",
+    "arrow-body-style": "off",
+    "import/extensions": "off",
+    "import/no-unresolved": "off",
+    "import/no-extraneous-dependencies": "off",
+    "func-names": "off"
+  }
+}
