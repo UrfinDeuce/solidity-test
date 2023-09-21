@@ -1,0 +1,23 @@
+name: build
+on: push
+
+jobs:
+  coverage:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: setup-node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: install
+        run: yarn install
+      - name: build
+        run: yarn hardhat compile
+      - name: upload artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: artifacts
+          path: artifacts/contracts

@@ -1,0 +1,20 @@
+name: lint
+on: push
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: setup-node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: install
+        run: yarn install
+      - name: lint ts
+        run: yarn eslint .
+      - name: lint sol
+        run: yarn prettier .

@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { type ERC20 } from '../typechain-types';
+import { type MyERC20 } from '../typechain-types/contracts/MyERC20';
 import { type SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 const PRICE = ethers.BigNumber.from(1000000000);
@@ -9,17 +9,17 @@ const AMOUNT = ethers.BigNumber.from(1000);
 const NAME = 'MyToken';
 const SYMBOL = 'MTK';
 
-describe('ERC20', function () {
+describe('MyERC20', function () {
   async function deployContractsFixture(): Promise<{
-    token: ERC20;
+    token: MyERC20;
     user: SignerWithAddress;
     from: SignerWithAddress;
     to: SignerWithAddress;
     owner: SignerWithAddress;
     spender: SignerWithAddress;
   }> {
-    const ERC20 = await ethers.getContractFactory('ERC20');
-    const token = await ERC20.deploy(NAME, SYMBOL, PRICE);
+    const MyERC20 = await ethers.getContractFactory('MyERC20');
+    const token = await MyERC20.deploy(NAME, SYMBOL, PRICE);
     const [owner, spender, user, from, to] = await ethers.getSigners();
 
     return { token, user, from, to, owner, spender };
