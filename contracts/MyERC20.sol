@@ -2,8 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MyERC20 is ERC20 {
+contract MyERC20 is ERC20, Ownable {
     // Token price
     uint256 private _price;
 
@@ -48,5 +49,15 @@ contract MyERC20 is ERC20 {
      */
     function burn(uint256 amount) external {
         _burn(msg.sender, amount);
+    }
+
+    /**
+     * @dev Transfers all Ether from contract to owner.
+     *
+     * Requirements:
+     * - message sender must be owner.
+     */
+    function withdrawEther() external onlyOwner {
+        payable(msg.sender).transfer(address(this).balance);
     }
 }

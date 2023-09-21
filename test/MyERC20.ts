@@ -8,6 +8,7 @@ const PRICE = ethers.BigNumber.from(1000000000);
 const AMOUNT = ethers.BigNumber.from(1000);
 const NAME = 'MyToken';
 const SYMBOL = 'MTK';
+const tokenAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
 describe('MyERC20', function () {
   async function deployContractsFixture(): Promise<{
@@ -18,19 +19,23 @@ describe('MyERC20', function () {
     owner: SignerWithAddress;
     spender: SignerWithAddress;
   }> {
-    const MyERC20 = await ethers.getContractFactory('MyERC20');
-    const token = await MyERC20.deploy(NAME, SYMBOL, PRICE);
     const [owner, spender, user, from, to] = await ethers.getSigners();
+    const MyERC20 = await ethers.getContractFactory('MyERC20', owner);
+    const token = await MyERC20.deploy(NAME, SYMBOL, PRICE);
 
     return { token, user, from, to, owner, spender };
   }
   describe('Deploy', function () {
     it('Should deploy with proper address', async function () {
       const { token } = await loadFixture(deployContractsFixture);
-      // console.log(token.address);
-      const tokenAddress = token.address;
 
       expect(token.address).to.be.equal(tokenAddress);
+    });
+
+    it('Should deploy with proper owner address', async function () {
+      const { token, owner } = await loadFixture(deployContractsFixture);
+
+      expect(await token.owner()).to.be.equal(owner.address);
     });
 
     it('Should deploy with right name', async function () {
@@ -74,6 +79,7 @@ describe('MyERC20', function () {
 
       const mintAmount = AMOUNT;
       const currTotalSupply = await token.totalSupply();
+
       await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
       expect(await token.totalSupply()).to.be.equal(currTotalSupply.add(mintAmount));
     });
@@ -82,6 +88,7 @@ describe('MyERC20', function () {
       const { token, user } = await loadFixture(deployContractsFixture);
 
       const mintAmount = AMOUNT;
+
       await expect(token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) }))
         .to.emit(token, 'Transfer')
         .withArgs(ethers.constants.AddressZero, user.address, mintAmount);
@@ -91,6 +98,7 @@ describe('MyERC20', function () {
       const { token, user } = await loadFixture(deployContractsFixture);
 
       const mintAmount = AMOUNT;
+
       await expect(
         async () => await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) }),
       ).to.changeEtherBalance(token.address, PRICE.mul(mintAmount));
@@ -100,6 +108,7 @@ describe('MyERC20', function () {
       const { token, user } = await loadFixture(deployContractsFixture);
 
       const mintAmount = AMOUNT;
+
       await expect(
         async () => await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) }),
       ).to.changeEtherBalance(user.address, PRICE.mul(mintAmount).mul(-1));
@@ -109,6 +118,7 @@ describe('MyERC20', function () {
       const { token, user } = await loadFixture(deployContractsFixture);
 
       const mintAmount = AMOUNT;
+
       await expect(
         token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount).sub(1) }),
       ).to.be.revertedWith('ERC20: value is less than required');
@@ -140,6 +150,7 @@ describe('MyERC20', function () {
   describe('Transfer', function () {
     it('Should increase balance of `to` address', async function () {
       const { token, from, to } = await loadFixture(deployContractsFixture);
+
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
       await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
@@ -344,14 +355,6 @@ describe('MyERC20', function () {
         token.connect(owner).approve(ethers.constants.AddressZero, approveAmount),
       ).to.be.revertedWith('ERC20: approve to the zero address');
     });
-    // it('Should revert if approval given from zero address', async function () {
-    //   const { token, spender } = await loadFixture(deployContractsFixture)
-
-    //   const approveAmount = AMOUNT
-
-    //   await expect(token.connect(ethers.constants.AddressZero).approve(spender.address, approveAmount))
-    //     .to.be.revertedWith('ERC20: approve from the zero address')
-    // })
 
     it('Should work for several approvals for different addresses', async function () {
       const { token } = await loadFixture(deployContractsFixture);
@@ -420,7 +423,7 @@ describe('MyERC20', function () {
       );
     });
   });
-  // Decrease allowance
+
   describe('Decrease allowance', function () {
     it('Should update `_allowances` mapping by decreasing on `amount`', async function () {
       const { token, owner, spender } = await loadFixture(deployContractsFixture);
@@ -674,6 +677,54 @@ describe('MyERC20', function () {
         currAllowanceUser3Owner.sub(transferAmount),
       );
       expect(await token.totalSupply()).to.be.equal(currTotalSupply);
+    });
+  });
+
+  describe('withdrawEther', function () {
+    it('Should increase owner Ether balance on contract Ether balance amount', async function () {
+      const { token, owner, user } = await loadFixture(deployContractsFixture);
+
+      const mintAmount = AMOUNT;
+      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      const tokenEtherBalance = await ethers.provider.getBalance(token.address);
+
+      await expect(token.connect(owner).withdrawEther()).to.changeEtherBalance(
+        owner,
+        tokenEtherBalance,
+      );
+    });
+
+    it('Should decrease contract Ether balance to 0', async function () {
+      const { token, owner, user } = await loadFixture(deployContractsFixture);
+      const mintAmount = AMOUNT;
+      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(owner).withdrawEther();
+
+      expect(await ethers.provider.getBalance(token.address)).to.be.equal(
+        ethers.BigNumber.from(0),
+      );
+    });
+
+    it('Should not change total supply', async function () {
+      const { token, owner, user } = await loadFixture(deployContractsFixture);
+      const mintAmount = AMOUNT;
+      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      const currTotalSupply = await token.totalSupply();
+      await token.connect(owner).withdrawEther();
+
+      expect(await token.totalSupply()).to.be.equal(currTotalSupply);
+    });
+
+    it('Should revert if message sender is not owner', async function () {
+      const { token, user } = await loadFixture(deployContractsFixture);
+
+      const mintAmount = AMOUNT;
+      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+
+      await expect(token.connect(user).withdrawEther()).to.be.revertedWith(
+        'Ownable: caller is not the owner',
+      );
     });
   });
 });
