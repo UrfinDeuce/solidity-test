@@ -2,21 +2,21 @@ import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import { type ERC20 } from '../typechain-types';
-import { type SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { type HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers';
 
-const PRICE = ethers.BigNumber.from(1000000000);
-const AMOUNT = ethers.BigNumber.from(1000);
+const PRICE = 1000000000n;
+const AMOUNT = 1000n;
 const NAME = 'MyToken';
 const SYMBOL = 'MTK';
 
 describe('ERC20', function () {
   async function deployContractsFixture(): Promise<{
     token: ERC20;
-    user: SignerWithAddress;
-    from: SignerWithAddress;
-    to: SignerWithAddress;
-    owner: SignerWithAddress;
-    spender: SignerWithAddress;
+    user: HardhatEthersSigner;
+    from: HardhatEthersSigner;
+    to: HardhatEthersSigner;
+    owner: HardhatEthersSigner;
+    spender: HardhatEthersSigner;
   }> {
     const ERC20 = await ethers.getContractFactory('ERC20');
     const token = await ERC20.deploy(NAME, SYMBOL, PRICE);
@@ -27,10 +27,8 @@ describe('ERC20', function () {
   describe('Deploy', function () {
     it('Should deploy with proper address', async function () {
       const { token } = await loadFixture(deployContractsFixture);
-      // console.log(token.address);
-      const tokenAddress = token.address;
 
-      expect(token.address).to.be.equal(tokenAddress);
+      expect(await token.getAddress()).to.be.properAddress;
     });
 
     it('Should deploy with right name', async function () {
@@ -54,7 +52,7 @@ describe('ERC20', function () {
     it('Should deploy with 0 initial total supply', async function () {
       const { token } = await loadFixture(deployContractsFixture);
 
-      expect(await token.totalSupply()).to.be.equal(0);
+      expect(await token.totalSupply()).to.be.equal(0n);
     });
   });
 
@@ -65,7 +63,7 @@ describe('ERC20', function () {
       const mintAmount = AMOUNT;
 
       await expect(
-        token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) }),
+        token.connect(user).mint(mintAmount, { value: PRICE * mintAmount }),
       ).to.changeTokenBalance(token, user, mintAmount);
     });
 
@@ -74,17 +72,17 @@ describe('ERC20', function () {
 
       const mintAmount = AMOUNT;
       const currTotalSupply = await token.totalSupply();
-      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
-      expect(await token.totalSupply()).to.be.equal(currTotalSupply.add(mintAmount));
+      await token.connect(user).mint(mintAmount, { value: PRICE * mintAmount });
+      expect(await token.totalSupply()).to.be.equal(currTotalSupply + mintAmount);
     });
 
     it('Should emit transfer event with right args', async function () {
       const { token, user } = await loadFixture(deployContractsFixture);
 
       const mintAmount = AMOUNT;
-      await expect(token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) }))
+      await expect(token.connect(user).mint(mintAmount, { value: PRICE * mintAmount }))
         .to.emit(token, 'Transfer')
-        .withArgs(ethers.constants.AddressZero, user.address, mintAmount);
+        .withArgs(ethers.ZeroAddress, user.address, mintAmount);
     });
 
     it('Should increase contract Ether balance', async function () {
@@ -92,17 +90,16 @@ describe('ERC20', function () {
 
       const mintAmount = AMOUNT;
       await expect(
-        async () => await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) }),
-      ).to.changeEtherBalance(token.address, PRICE.mul(mintAmount));
+        token.connect(user).mint(mintAmount, { value: PRICE * mintAmount }),
+      ).to.changeEtherBalance(token, PRICE * mintAmount);
     });
-
     it('Should decrease caller Ether balance', async function () {
       const { token, user } = await loadFixture(deployContractsFixture);
 
       const mintAmount = AMOUNT;
       await expect(
-        async () => await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) }),
-      ).to.changeEtherBalance(user.address, PRICE.mul(mintAmount).mul(-1));
+        await token.connect(user).mint(mintAmount, { value: PRICE * mintAmount }),
+      ).to.changeEtherBalance(user, -PRICE * mintAmount);
     });
 
     it('Should revert if message value is less than price * token amount', async function () {
@@ -110,7 +107,7 @@ describe('ERC20', function () {
 
       const mintAmount = AMOUNT;
       await expect(
-        token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount).sub(1) }),
+        token.connect(user).mint(mintAmount, { value: PRICE * mintAmount - 1n }),
       ).to.be.revertedWith('ERC20: value is less than required');
     });
 
@@ -120,19 +117,19 @@ describe('ERC20', function () {
 
       const mintAmount = AMOUNT;
       const currTotalSupply = await token.totalSupply();
-      const currBalance = await ethers.provider.getBalance(token.address);
+      const currBalance = await ethers.provider.getBalance(await token.getAddress());
 
-      await token.connect(user1).mint(mintAmount, { value: PRICE.mul(mintAmount) });
-      await token.connect(user2).mint(mintAmount, { value: PRICE.mul(mintAmount) });
-      await token.connect(user3).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(user1).mint(mintAmount, { value: PRICE * mintAmount });
+      await token.connect(user2).mint(mintAmount, { value: PRICE * mintAmount });
+      await token.connect(user3).mint(mintAmount, { value: PRICE * mintAmount });
 
       expect(await token.balanceOf(user1.address)).to.be.equal(mintAmount);
       expect(await token.balanceOf(user2.address)).to.be.equal(mintAmount);
       expect(await token.balanceOf(user3.address)).to.be.equal(mintAmount);
 
-      expect(await token.totalSupply()).to.be.equal(currTotalSupply.add(mintAmount.mul(3)));
-      expect(await ethers.provider.getBalance(token.address)).to.be.equal(
-        currBalance.add(PRICE.mul(mintAmount).mul(3)),
+      expect(await token.totalSupply()).to.be.equal(currTotalSupply + mintAmount * 3n);
+      expect(await ethers.provider.getBalance(await token.getAddress())).to.be.equal(
+        currBalance + PRICE * mintAmount * 3n,
       );
     });
   });
@@ -142,7 +139,7 @@ describe('ERC20', function () {
       const { token, from, to } = await loadFixture(deployContractsFixture);
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(token.connect(from).transfer(to.address, transferAmount)).to.changeTokenBalance(
         token,
@@ -156,12 +153,12 @@ describe('ERC20', function () {
 
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(token.connect(from).transfer(to.address, transferAmount)).to.changeTokenBalance(
         token,
         from,
-        transferAmount.mul(-1),
+        -transferAmount,
       );
     });
 
@@ -170,7 +167,7 @@ describe('ERC20', function () {
 
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       const currTotalSupply = await token.totalSupply();
       await token.connect(from).transfer(to.address, transferAmount);
 
@@ -182,7 +179,7 @@ describe('ERC20', function () {
 
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(token.connect(from).transfer(to.address, transferAmount))
         .to.emit(token, 'Transfer')
@@ -194,10 +191,10 @@ describe('ERC20', function () {
 
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(
-        token.connect(from).transfer(ethers.constants.AddressZero, transferAmount),
+        token.connect(from).transfer(ethers.ZeroAddress, transferAmount),
       ).to.be.revertedWith('ERC20: transfer to the zero address');
     });
 
@@ -205,8 +202,8 @@ describe('ERC20', function () {
       const { token, from, to } = await loadFixture(deployContractsFixture);
 
       const transferAmount = AMOUNT;
-      const mintAmount = AMOUNT.sub(1);
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      const mintAmount = AMOUNT - 1n;
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(token.connect(from).transfer(to.address, transferAmount)).to.be.revertedWith(
         'ERC20: transfer amount exceeds balance',
@@ -218,16 +215,16 @@ describe('ERC20', function () {
       const [user1, user2, user3] = await ethers.getSigners();
 
       const transferAmount = AMOUNT;
-      const mintAmount = AMOUNT.mul(3);
-      await token.connect(user1).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      const mintAmount = AMOUNT * 3n;
+      await token.connect(user1).mint(mintAmount, { value: PRICE * mintAmount });
       const currTotalSupply = await token.totalSupply();
 
       await expect(
         token.connect(user1).transfer(user2.address, transferAmount),
-      ).to.changeTokenBalances(token, [user1, user2], [transferAmount.mul(-1), transferAmount]);
+      ).to.changeTokenBalances(token, [user1, user2], [-transferAmount, transferAmount]);
       await expect(
         token.connect(user1).transfer(user3.address, transferAmount),
-      ).to.changeTokenBalances(token, [user1, user3], [transferAmount.mul(-1), transferAmount]);
+      ).to.changeTokenBalances(token, [user1, user3], [-transferAmount, transferAmount]);
 
       expect(await token.totalSupply()).to.be.equal(currTotalSupply);
     });
@@ -239,12 +236,12 @@ describe('ERC20', function () {
 
       const burnAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(user).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(token.connect(user).burn(burnAmount)).to.changeTokenBalance(
         token,
         user,
-        burnAmount.mul(-1),
+        -burnAmount,
       );
     });
 
@@ -253,11 +250,11 @@ describe('ERC20', function () {
 
       const burnAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(user).mint(mintAmount, { value: PRICE * mintAmount });
       const currTotalSupply = await token.totalSupply();
       await token.connect(user).burn(burnAmount);
 
-      expect(await token.totalSupply()).to.be.equal(currTotalSupply.sub(burnAmount));
+      expect(await token.totalSupply()).to.be.equal(currTotalSupply - burnAmount);
     });
 
     it('Should emit transfer event with right args', async function () {
@@ -265,19 +262,19 @@ describe('ERC20', function () {
 
       const burnAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(user).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(token.connect(user).burn(burnAmount))
         .to.emit(token, 'Transfer')
-        .withArgs(user.address, ethers.constants.AddressZero, burnAmount);
+        .withArgs(user.address, ethers.ZeroAddress, burnAmount);
     });
 
     it('Should revert if caller balance is less that amount to burn', async function () {
       const { token, user } = await loadFixture(deployContractsFixture);
 
       const burnAmount = AMOUNT;
-      const mintAmount = AMOUNT.sub(1);
-      await token.connect(user).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      const mintAmount = AMOUNT - 1n;
+      await token.connect(user).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(token.connect(user).burn(burnAmount)).to.be.revertedWith(
         'ERC20: burn amount exceeds balance',
@@ -290,28 +287,28 @@ describe('ERC20', function () {
 
       const burnAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(user1).mint(mintAmount, { value: PRICE.mul(mintAmount) });
-      await token.connect(user2).mint(mintAmount, { value: PRICE.mul(mintAmount) });
-      await token.connect(user3).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(user1).mint(mintAmount, { value: PRICE * mintAmount });
+      await token.connect(user2).mint(mintAmount, { value: PRICE * mintAmount });
+      await token.connect(user3).mint(mintAmount, { value: PRICE * mintAmount });
       const currTotalSupply = await token.totalSupply();
 
       await expect(token.connect(user1).burn(burnAmount)).to.changeTokenBalance(
         token,
         user1,
-        burnAmount.mul(-1),
+        -burnAmount,
       );
       await expect(token.connect(user2).burn(burnAmount)).to.changeTokenBalance(
         token,
         user2,
-        burnAmount.mul(-1),
+        -burnAmount,
       );
       await expect(token.connect(user3).burn(burnAmount)).to.changeTokenBalance(
         token,
         user3,
-        burnAmount.mul(-1),
+        -burnAmount,
       );
 
-      expect(await token.totalSupply()).to.be.equal(currTotalSupply.sub(burnAmount.mul(3)));
+      expect(await token.totalSupply()).to.be.equal(currTotalSupply - burnAmount * 3n);
     });
   });
 
@@ -341,17 +338,9 @@ describe('ERC20', function () {
       const approveAmount = AMOUNT;
 
       await expect(
-        token.connect(owner).approve(ethers.constants.AddressZero, approveAmount),
+        token.connect(owner).approve(ethers.ZeroAddress, approveAmount),
       ).to.be.revertedWith('ERC20: approve to the zero address');
     });
-    // it('Should revert if approval given from zero address', async function () {
-    //   const { token, spender } = await loadFixture(deployContractsFixture)
-
-    //   const approveAmount = AMOUNT
-
-    //   await expect(token.connect(ethers.constants.AddressZero).approve(spender.address, approveAmount))
-    //     .to.be.revertedWith('ERC20: approve from the zero address')
-    // })
 
     it('Should work for several approvals for different addresses', async function () {
       const { token } = await loadFixture(deployContractsFixture);
@@ -377,7 +366,7 @@ describe('ERC20', function () {
       await token.connect(owner).increaseAllowance(spender.address, increaseAmount);
 
       expect(await token.allowance(owner.address, spender.address)).to.be.equal(
-        currAllowance.add(increaseAmount),
+        currAllowance + increaseAmount,
       );
     });
 
@@ -389,7 +378,7 @@ describe('ERC20', function () {
 
       await expect(token.connect(owner).increaseAllowance(spender.address, increaseAmount))
         .to.emit(token, 'Approval')
-        .withArgs(owner.address, spender.address, currAllowance.add(increaseAmount));
+        .withArgs(owner.address, spender.address, currAllowance + increaseAmount);
     });
 
     it('Should revert if approval given for zero address', async function () {
@@ -398,7 +387,7 @@ describe('ERC20', function () {
       const increaseAmount = AMOUNT;
 
       await expect(
-        token.connect(owner).increaseAllowance(ethers.constants.AddressZero, increaseAmount),
+        token.connect(owner).increaseAllowance(ethers.ZeroAddress, increaseAmount),
       ).to.be.revertedWith('ERC20: approve to the zero address');
     });
 
@@ -413,10 +402,10 @@ describe('ERC20', function () {
       await token.connect(user1).approve(user3.address, approveAmount);
 
       expect(await token.allowance(user1.address, user2.address)).to.be.equal(
-        currAllowanceUser1User2.add(approveAmount),
+        currAllowanceUser1User2 + approveAmount,
       );
       expect(await token.allowance(user1.address, user3.address)).to.be.equal(
-        currAllowanceUser1User3.add(approveAmount),
+        currAllowanceUser1User3 + approveAmount,
       );
     });
   });
@@ -427,12 +416,12 @@ describe('ERC20', function () {
 
       const approveAmount = AMOUNT;
       await token.connect(owner).approve(spender.address, approveAmount);
-      const decreaseAmount = AMOUNT;
+      const decreaseAmount = AMOUNT / 2n;
       const currAllowance = await token.allowance(owner.address, spender.address);
       await token.connect(owner).decreaseAllowance(spender.address, decreaseAmount);
 
       expect(await token.allowance(owner.address, spender.address)).to.be.equal(
-        currAllowance.sub(decreaseAmount),
+        currAllowance - decreaseAmount,
       );
     });
 
@@ -441,12 +430,12 @@ describe('ERC20', function () {
 
       const approveAmount = AMOUNT;
       await token.connect(owner).approve(spender.address, approveAmount);
-      const decreaseAmount = AMOUNT;
+      const decreaseAmount = AMOUNT / 2n;
       const currAllowance = await token.allowance(owner.address, spender.address);
 
       await expect(token.connect(owner).decreaseAllowance(spender.address, decreaseAmount))
         .to.emit(token, 'Approval')
-        .withArgs(owner.address, spender.address, currAllowance.sub(decreaseAmount));
+        .withArgs(owner.address, spender.address, currAllowance - decreaseAmount);
     });
 
     it('Should revert if approval given for zero address', async function () {
@@ -454,16 +443,15 @@ describe('ERC20', function () {
 
       const decreaseAmount = AMOUNT;
 
-      await expect(
-        token.connect(owner).decreaseAllowance(ethers.constants.AddressZero, decreaseAmount),
-      ).to.be.reverted;
+      await expect(token.connect(owner).decreaseAllowance(ethers.ZeroAddress, decreaseAmount)).to
+        .be.reverted;
     });
 
     it('Should revert if decreased allowance is below zero', async function () {
       const { token, owner, spender } = await loadFixture(deployContractsFixture);
 
       const approveAmount = AMOUNT;
-      const decreaseAmount = approveAmount.add(1);
+      const decreaseAmount = approveAmount + 1n;
       await token.connect(owner).approve(spender.address, approveAmount);
 
       await expect(
@@ -476,7 +464,7 @@ describe('ERC20', function () {
       const [user1, user2, user3] = await ethers.getSigners();
 
       const approveAmount = AMOUNT;
-      const decreaseAmount = approveAmount.sub(100);
+      const decreaseAmount = approveAmount - 100n;
       await token.connect(user1).approve(user2.address, approveAmount);
       await token.connect(user1).approve(user3.address, approveAmount);
       const currAllowanceUser1User2 = await token.allowance(user1.address, user2.address);
@@ -485,10 +473,10 @@ describe('ERC20', function () {
       await token.connect(user1).decreaseAllowance(user3.address, decreaseAmount);
 
       expect(await token.allowance(user1.address, user2.address)).to.be.equal(
-        currAllowanceUser1User2.sub(decreaseAmount),
+        currAllowanceUser1User2 - decreaseAmount,
       );
       expect(await token.allowance(user1.address, user3.address)).to.be.equal(
-        currAllowanceUser1User3.sub(decreaseAmount),
+        currAllowanceUser1User3 - decreaseAmount,
       );
     });
   });
@@ -497,26 +485,26 @@ describe('ERC20', function () {
     it('Should update `_allowances` mapping by decreasing on `amount`', async function () {
       const { token, owner, from, to } = await loadFixture(deployContractsFixture);
 
-      const transferAmount = AMOUNT.sub(500);
+      const transferAmount = AMOUNT - 500n;
       const mintAmount = AMOUNT;
       const approveAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
       const currAllowance = await token.allowance(from.address, owner.address);
       await token.connect(owner).transferFrom(from.address, to.address, transferAmount);
 
       expect(await token.allowance(from.address, owner.address)).to.be.equal(
-        currAllowance.sub(transferAmount),
+        currAllowance - transferAmount,
       );
     });
 
     it('Should increase balance of `to` address', async function () {
       const { token, owner, from, to } = await loadFixture(deployContractsFixture);
 
-      const transferAmount = AMOUNT.sub(500);
+      const transferAmount = AMOUNT - 500n;
       const mintAmount = AMOUNT;
       const approveAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
 
       await expect(
@@ -527,24 +515,24 @@ describe('ERC20', function () {
     it('Should decrease balance of `from` address', async function () {
       const { token, owner, from, to } = await loadFixture(deployContractsFixture);
 
-      const transferAmount = AMOUNT.sub(500);
+      const transferAmount = AMOUNT - 500n;
       const mintAmount = AMOUNT;
       const approveAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
 
       await expect(
         token.connect(owner).transferFrom(from.address, to.address, transferAmount),
-      ).to.changeTokenBalance(token, from, transferAmount.mul(-1));
+      ).to.changeTokenBalance(token, from, -transferAmount);
     });
 
     it('Should not change total supply', async function () {
       const { token, owner, from, to } = await loadFixture(deployContractsFixture);
 
-      const transferAmount = AMOUNT.sub(500);
+      const transferAmount = AMOUNT - 500n;
       const mintAmount = AMOUNT;
       const approveAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
       const currTotalSupply = await token.totalSupply();
 
@@ -559,7 +547,7 @@ describe('ERC20', function () {
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
       const approveAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
 
       await expect(token.connect(owner).transferFrom(from.address, to.address, transferAmount))
@@ -573,13 +561,11 @@ describe('ERC20', function () {
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
       const approveAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
 
       await expect(
-        token
-          .connect(owner)
-          .transferFrom(from.address, ethers.constants.AddressZero, transferAmount),
+        token.connect(owner).transferFrom(from.address, ethers.ZeroAddress, transferAmount),
       ).to.be.revertedWith('ERC20: transfer to the zero address');
     });
 
@@ -589,9 +575,7 @@ describe('ERC20', function () {
       const transferAmount = AMOUNT;
 
       await expect(
-        token
-          .connect(owner)
-          .transferFrom(ethers.constants.AddressZero, to.address, transferAmount),
+        token.connect(owner).transferFrom(ethers.ZeroAddress, to.address, transferAmount),
       ).to.be.reverted;
       // Test will fail with error from _spendAllowance function
     });
@@ -601,8 +585,8 @@ describe('ERC20', function () {
 
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      const approveAmount = AMOUNT.sub(200);
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      const approveAmount = AMOUNT - 200n;
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
 
       await expect(
@@ -615,7 +599,7 @@ describe('ERC20', function () {
 
       const transferAmount = AMOUNT;
       const mintAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
 
       await expect(
         token.connect(owner).transferFrom(from.address, to.address, transferAmount),
@@ -625,9 +609,9 @@ describe('ERC20', function () {
     it('Should not revert if allowance is 0 and transfer amount is zero', async function () {
       const { token, owner, from, to } = await loadFixture(deployContractsFixture);
 
-      const transferAmount = ethers.BigNumber.from(0);
+      const transferAmount = 0n;
       const mintAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
 
       await token.connect(owner).transferFrom(from.address, to.address, transferAmount);
     });
@@ -636,9 +620,9 @@ describe('ERC20', function () {
       const { token, owner, from, to } = await loadFixture(deployContractsFixture);
 
       const transferAmount = AMOUNT;
-      const mintAmount = AMOUNT.sub(200);
+      const mintAmount = AMOUNT - 200n;
       const approveAmount = AMOUNT;
-      await token.connect(from).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(from).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(from).approve(owner.address, approveAmount);
 
       await expect(
@@ -650,11 +634,11 @@ describe('ERC20', function () {
       const { token } = await loadFixture(deployContractsFixture);
       const [owner, user1, user2, user3, user4] = await ethers.getSigners();
 
-      const transferAmount = AMOUNT.sub(500);
+      const transferAmount = AMOUNT - 500n;
       const mintAmount = AMOUNT;
       const approveAmount = AMOUNT;
-      await token.connect(user1).mint(mintAmount, { value: PRICE.mul(mintAmount) });
-      await token.connect(user3).mint(mintAmount, { value: PRICE.mul(mintAmount) });
+      await token.connect(user1).mint(mintAmount, { value: PRICE * mintAmount });
+      await token.connect(user3).mint(mintAmount, { value: PRICE * mintAmount });
       await token.connect(user1).approve(owner.address, approveAmount);
       await token.connect(user3).approve(owner.address, approveAmount);
       const currAllowanceUser1Owner = await token.allowance(user1.address, owner.address);
@@ -663,15 +647,15 @@ describe('ERC20', function () {
 
       await expect(
         token.connect(owner).transferFrom(user1.address, user2.address, transferAmount),
-      ).to.changeTokenBalances(token, [user1, user2], [transferAmount.mul(-1), transferAmount]);
+      ).to.changeTokenBalances(token, [user1, user2], [-transferAmount, transferAmount]);
       await expect(
         token.connect(owner).transferFrom(user3.address, user4.address, transferAmount),
-      ).to.changeTokenBalances(token, [user3, user4], [transferAmount.mul(-1), transferAmount]);
+      ).to.changeTokenBalances(token, [user3, user4], [-transferAmount, transferAmount]);
       expect(await token.allowance(user1.address, owner.address)).to.be.equal(
-        currAllowanceUser1Owner.sub(transferAmount),
+        currAllowanceUser1Owner - transferAmount,
       );
       expect(await token.allowance(user3.address, owner.address)).to.be.equal(
-        currAllowanceUser3Owner.sub(transferAmount),
+        currAllowanceUser3Owner - transferAmount,
       );
       expect(await token.totalSupply()).to.be.equal(currTotalSupply);
     });
